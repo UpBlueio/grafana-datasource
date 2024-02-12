@@ -292,7 +292,7 @@ export function transform(
 
   // Return early again if the format is table, this needs special transformation.
   if (options.format === 'table') {
-    const tableData = transformMetricDataToTable(prometheusResult.result, options);
+    const tableData = transformMetricDataToTable(prometheusResult.result, options, prometheusResult.resultType);
     return {
       dataFrame: [tableData],
       traceResult
@@ -301,7 +301,9 @@ export function transform(
 
   // Process matrix and vector results to DataFrame
   const dataFrame: DataFrame[] = [];
-  prometheusResult.result.forEach((data: MatrixOrVectorResult) => dataFrame.push(transformToDataFrame(data, options)));
+  prometheusResult.result.forEach((data: MatrixOrVectorResult) =>
+    dataFrame.push(transformToDataFrame(data, options, prometheusResult.resultType))
+  );
 
   // When format is heatmap use the already created data frames and transform it more
   if (options.format === 'heatmap') {
@@ -352,37 +354,63 @@ function getDataLinks(options: ExemplarTraceIdDestination): DataLink[] {
 /**
  * Transforms matrix and vector result from Prometheus result to DataFrame
  */
-function transformToDataFrame(data: MatrixOrVectorResult, options: TransformOptions): DataFrame {
+function transformToDataFrame(data: MatrixOrVectorResult, options: TransformOptions, resultType: any): DataFrame {
   const { name, labels } = createLabelInfo(data.metric, options);
 
   const fields: Field[] = [];
 
   if (isMatrixData(data)) {
-    const stepMs = options.step ? options.step * 1000 : NaN;
-    let baseTimestamp = options.start * 1000;
-    const dps: PromValue[] = [];
+    if (resultType === 'matrix_string') {
+      const stepMs = options.step ? options.step * 1000 : NaN;
+      let baseTimestamp = options.start * 1000;
+      const dps: PromValue[] = [];
+      let lastString: string | null
+      lastString = null
+      for (const value of data.values) {
+        let dpString: string | null = value[1];
+        const timestamp = value[0] * 1000;
+        //fill the gaps between to points and between start and the first point
+        for (let t = baseTimestamp; t < timestamp; t += stepMs) {
+          dps.push([t, lastString]);
+        }
+        baseTimestamp = timestamp + stepMs;
+        dps.push([timestamp, dpString]);
+        lastString = value[1];
+      }
+      //fill the end
+     const endTimestamp = options.end * 1000;
+      for (let t = baseTimestamp; t <= endTimestamp; t += stepMs) {
+        dps.push([t, lastString]);
+      }
+      fields.push(getTimeField(dps, true));
+      fields.push(getStringField({ data: dps, labels, displayNameFromDS: name }));
+    } else {
+      const stepMs = options.step ? options.step * 1000 : NaN;
+      let baseTimestamp = options.start * 1000;
+      const dps: PromValue[] = [];
 
-    for (const value of data.values) {
-      let dpValue: number | null = parseSampleValue(value[1]);
+      for (const value of data.values) {
+        let dpValue: number | null = parseSampleValue(value[1]);
 
-      if (isNaN(dpValue)) {
-        dpValue = null;
+        if (isNaN(dpValue)) {
+          dpValue = null;
+        }
+
+        const timestamp = value[0] * 1000;
+        for (let t = baseTimestamp; t < timestamp; t += stepMs) {
+          dps.push([t, null]);
+        }
+        baseTimestamp = timestamp + stepMs;
+        dps.push([timestamp, dpValue]);
       }
 
-      const timestamp = value[0] * 1000;
-      for (let t = baseTimestamp; t < timestamp; t += stepMs) {
+      const endTimestamp = options.end * 1000;
+      for (let t = baseTimestamp; t <= endTimestamp; t += stepMs) {
         dps.push([t, null]);
       }
-      baseTimestamp = timestamp + stepMs;
-      dps.push([timestamp, dpValue]);
+      fields.push(getTimeField(dps, true));
+      fields.push(getValueField({ data: dps, parseValue: false, labels, displayNameFromDS: name }));
     }
-
-    const endTimestamp = options.end * 1000;
-    for (let t = baseTimestamp; t <= endTimestamp; t += stepMs) {
-      dps.push([t, null]);
-    }
-    fields.push(getTimeField(dps, true));
-    fields.push(getValueField({ data: dps, parseValue: false, labels, displayNameFromDS: name }));
   } else {
     fields.push(getTimeField([data.value]));
     fields.push(getValueField({ data: [data.value], labels, displayNameFromDS: name }));
@@ -397,7 +425,7 @@ function transformToDataFrame(data: MatrixOrVectorResult, options: TransformOpti
   };
 }
 
-function transformMetricDataToTable(md: MatrixOrVectorResult[], options: TransformOptions): DataFrame {
+function transformMetricDataToTable(md: MatrixOrVectorResult[], options: TransformOptions, resultType: any): DataFrame {
   if (!md || md.length === 0) {
     return {
       meta: options.meta,
@@ -427,11 +455,20 @@ function transformMetricDataToTable(md: MatrixOrVectorResult[], options: Transfo
 
   md.forEach((d) => {
     if (isMatrixData(d)) {
-      d.values.forEach((val) => {
-        timeField.values.add(val[0] * 1000);
-        metricFields.forEach((metricField) => metricField.values.add(getLabelValue(d.metric, metricField.name)));
-        valueField.values.add(parseSampleValue(val[1]));
-      });
+      if (resultType === 'matrix_string') {
+        console.log("matrix string table")
+        d.values.forEach((val) => {
+          timeField.values.add(val[0] * 1000);
+          metricFields.forEach((metricField) => metricField.values.add(getLabelValue(d.metric, metricField.name)));
+          valueField.values.add(val[1]);
+        });
+      } else {
+        d.values.forEach((val) => {
+          timeField.values.add(val[0] * 1000);
+          metricFields.forEach((metricField) => metricField.values.add(getLabelValue(d.metric, metricField.name)));
+          valueField.values.add(parseSampleValue(val[1]));
+        });
+      }
     } else {
       timeField.values.add(d.value[0] * 1000);
       metricFields.forEach((metricField) => metricField.values.add(getLabelValue(d.metric, metricField.name)));
@@ -475,12 +512,12 @@ type ValueFieldOptions = {
 };
 
 function getValueField({
-                         data,
-                         valueName = TIME_SERIES_VALUE_FIELD_NAME,
-                         parseValue = true,
-                         labels,
-                         displayNameFromDS,
-                       }: ValueFieldOptions): MutableField {
+  data,
+  valueName = TIME_SERIES_VALUE_FIELD_NAME,
+  parseValue = true,
+  labels,
+  displayNameFromDS,
+}: ValueFieldOptions): MutableField {
   return {
     name: valueName,
     type: FieldType.number,
@@ -492,7 +529,23 @@ function getValueField({
     values: new ArrayVector<number | null>(data.map((val) => (parseValue ? parseSampleValue(val[1]) : val[1]))),
   };
 }
-
+function getStringField({
+  data,
+  valueName = TIME_SERIES_VALUE_FIELD_NAME,
+  labels,
+  displayNameFromDS,
+}: ValueFieldOptions): MutableField {
+  return {
+    name: valueName,
+    type: FieldType.number,
+    display: getDisplayProcessor(),
+    config: {
+      displayNameFromDS,
+    },
+    labels,
+    values: new ArrayVector<string | null>(data.map((val) => val[1])),
+  };
+}
 function createLabelInfo(labels: { [key: string]: string }, options: TransformOptions) {
   const legendFormat = options?.legendFormat
   if (legendFormat && legendFormat !== LegendFormatMode.Auto) {

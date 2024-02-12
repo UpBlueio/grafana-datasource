@@ -1,6 +1,6 @@
 {
   "type": "datasource",
-  "name": "VictoriaMetrics",
+  "name": "UpBlue",
   "id": "victoriametrics-datasource",
   "category": "tsdb",
   "routes": [
@@ -59,12 +59,13 @@
     "minInterval": true
   },
   "info": {
-    "description": "VictoriaMetrics datasource plugin for Grafana",
+    "description": "UpBlue datasource plugin for Grafana",
     "author": {
-      "name": "VictoriaMetrics",
-      "url": "https://victoriametrics.com/"
+      "name": "UpBlue",
+      "url": "https://upblue.io/"
     },
     "keywords": [
+      "UpBlue",
       "VictoriaMetrics",
       "datasource"
     ],
@@ -85,7 +86,7 @@
     "links": [
       {
         "name": "Learn more",
-        "url": "https://docs.victoriametrics.com/"
+        "url": "https://docs.upblue.io"
       }
     ],
     "version": "%VERSION%",
