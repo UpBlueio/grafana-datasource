@@ -24,7 +24,7 @@ import { ConfirmModal, IconButton } from '@grafana/ui';
 
 import PrettifyQuery from "../../components/PrettifyQuery";
 import { EditorHeader, EditorRows, FlexItem, InlineSelect, Space } from '../../components/QueryEditor';
-import VmuiLink from "../../components/VmuiLink";
+// import VmuiLink from "../../components/VmuiLink";
 import WithTemplateConfig from "../../components/WithTemplateConfig";
 import { WithTemplate } from "../../components/WithTemplateConfig/types";
 import { getArrayFromTemplate } from "../../components/WithTemplateConfig/utils/getArrayFromTemplate";
@@ -155,7 +155,7 @@ export const PromQueryEditorSelector = React.memo<Props>((props) => {
           datasource={datasource}
         />
         <PrettifyQuery query={query} datasource={datasource} onChange={onChange}/>
-        <VmuiLink query={query} datasource={datasource} panelData={data} dashboardUID={dashboardUID}/>
+        {/* <VmuiLink query={query} datasource={datasource} panelData={data} dashboardUID={dashboardUID}/> */}
         {app !== CoreApp.Explore && (
           <IconButton
             key="run"

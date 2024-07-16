@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	vector, matrix, scalar = "vector", "matrix", "scalar"
+	vector, matrix, scalar, matrixstring = "vector", "matrix", "scalar", "matrix_string2"
 )
 
 // Result represents timeseries from query
@@ -92,10 +92,64 @@ func (pr promRange) dataframes() (data.Frames, error) {
 			data.NewField(data.TimeSeriesTimeFieldName, nil, timestamps),
 			data.NewField(data.TimeSeriesValueFieldName, data.Labels(res.Labels), values))
 	}
-
 	return frames, nil
 }
 
+type promRangeString struct {
+	Result []Result `json:"result"`
+}
+
+func (pr promRangeString) dataframes() (data.Frames, error) {
+	frames := make(data.Frames, len(pr.Result))
+	for i, res := range pr.Result {
+		timestamps := make([]time.Time, len(res.Values))
+		values := make([]string, len(res.Values))
+		for j, value := range res.Values {
+			v, ok := value[0].(float64)
+			if !ok {
+				return nil, fmt.Errorf("error get time from dataframes")
+			}
+			timestamps[j] = time.Unix(int64(v), 0)
+			values[j] = value[1].(string)
+		}
+
+		if len(values) < 1 || len(timestamps) < 1 {
+			return nil, fmt.Errorf("metric %v contains no values", res)
+		}
+
+		frames[i] = data.NewFrame("",
+			data.NewField(data.TimeSeriesTimeFieldName, nil, timestamps),
+			data.NewField("string", data.Labels(res.Labels), values))
+	}
+	return frames, nil
+}
+
+/*
+	func (pr promRangeString) dataframes() (data.Frames, error) {
+		frames := make(data.Frames, len(pr.Result))
+		for i, res := range pr.Result {
+			timestamps := make([]time.Time, len(res.Values))
+			values := make([]float64, len(res.Values))
+			for j, value := range res.Values {
+				v, ok := value[0].(float64)
+				if !ok {
+					return nil, fmt.Errorf("error get time from dataframes")
+				}
+				timestamps[j] = time.Unix(int64(v), 0)
+				values[j] = float64(1)
+			}
+
+			if len(values) < 1 || len(timestamps) < 1 {
+				return nil, fmt.Errorf("metric %v contains no values", res)
+			}
+
+			frames[i] = data.NewFrame("",
+				data.NewField(data.TimeSeriesTimeFieldName, nil, timestamps),
+				data.NewField(data.TimeSeriesValueFieldName, data.Labels(res.Labels), values))
+		}
+		return frames, nil
+	}
+*/
 type promScalar Value
 
 func (ps promScalar) dataframes() (data.Frames, error) {
@@ -123,6 +177,12 @@ func (r *Response) getDataFrames() (data.Frames, error) {
 		return pi.dataframes()
 	case matrix:
 		var pr promRange
+		if err := json.Unmarshal(r.Data.Result, &pr.Result); err != nil {
+			return nil, fmt.Errorf("umarshal err %s; \n %#v", err, string(r.Data.Result))
+		}
+		return pr.dataframes()
+	case matrixstring:
+		var pr promRangeString
 		if err := json.Unmarshal(r.Data.Result, &pr.Result); err != nil {
 			return nil, fmt.Errorf("umarshal err %s; \n %#v", err, string(r.Data.Result))
 		}
