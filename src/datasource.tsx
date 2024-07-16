@@ -1,7 +1,7 @@
 // Copyright (c) 2022 Grafana Labs
 // Modifications Copyright (c) 2022 VictoriaMetrics
 // 2022-10-04: replace type to 'victoriametrics-datasource'
-// A detailed history of changes can be seen here - https://github.com/VictoriaMetrics/grafana-datasource
+// A detailed history of changes can be seen here - https://github.com/VictoriaMetrics/victoriametrics-datasource
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -35,6 +35,8 @@ import {
   dateMath,
   DateTime,
   dateTime,
+  getDefaultTimeRange,
+  LegacyMetricFindQueryOptions,
   LoadingState,
   QueryFixAction,
   rangeUtil,
@@ -64,6 +66,7 @@ import PrometheusLanguageProvider from './language_provider';
 import {
   escapeMetricNameSpecialCharacters,
   expandRecordingRules,
+  getVictoriaMetricsTime,
   unescapeMetricNameSpecialCharacters
 } from './language_utils';
 import { renderLegendFormat } from './legend';
@@ -145,7 +148,7 @@ export class PrometheusDatasource
     this.languageProvider = languageProvider ?? new PrometheusLanguageProvider(this);
     this.lookupsDisabled = instanceSettings.jsonData.disableMetricsLookup ?? false;
     this.customQueryParameters = new URLSearchParams(instanceSettings.jsonData.customQueryParameters);
-    this.variables = new PrometheusVariableSupport(this, this.templateSrv, this.timeSrv);
+    this.variables = new PrometheusVariableSupport(this, this.templateSrv);
     this.exemplarsAvailable = false;
     this.withTemplates = instanceSettings.jsonData.withTemplates ?? [];
     this.limitMetrics = instanceSettings.jsonData.limitMetrics ?? {};
@@ -388,7 +391,7 @@ export class PrometheusDatasource
 
 
       if (request.targets.every(t => t.refId === "Anno")) {
-        const query = request.targets[0] as PromQueryRequest
+        const query = { ...request.targets[0], expr: queries[0].expr } as PromQueryRequest
         return this.performAnnotationQuery({ ...query, start, end })
       }
 
@@ -536,16 +539,15 @@ export class PrometheusDatasource
 
     let expr = target.expr;
 
-    // Apply adhoc filters
-    expr = this.enhanceExprWithAdHocFilters(expr);
-
     // Apply WITH templates
     const dashboardUID = options.dashboardUID || options.app || ""
     expr = mergeTemplateWithQuery(expr, this.withTemplates.find(t => t.uid === dashboardUID))
 
     // Only replace vars in expression after having (possibly) updated interval vars
-    query.expr = this.templateSrv.replace(expr, scopedVars, this.interpolateQueryExpr);
+    expr = this.templateSrv.replace(expr, scopedVars, this.interpolateQueryExpr);
 
+    // Apply adhoc filters
+    query.expr = this.enhanceExprWithAdHocFilters(expr);
     // Align query interval with step to allow query caching and to ensure
     // that about-same-time query results look the same.
     const adjusted = alignRange(start, end, query.step, this.timeSrv.timeRange().to.utcOffset() * 60);
@@ -668,19 +670,20 @@ export class PrometheusDatasource
     return error;
   };
 
-  metricFindQuery(query: string) {
+  metricFindQuery(query: string, options?: LegacyMetricFindQueryOptions) {
     if (!query) {
       return Promise.resolve([]);
     }
 
+    const range = options?.range ?? getDefaultTimeRange()
     const scopedVars = {
       __interval: { text: this.interval, value: this.interval },
       __interval_ms: { text: rangeUtil.intervalToMs(this.interval), value: rangeUtil.intervalToMs(this.interval) },
-      ...this.getRangeScopedVars(this.timeSrv.timeRange()),
+      ...this.getRangeScopedVars(range),
     };
     const interpolated = this.templateSrv.replace(query, scopedVars, this.interpolateQueryExpr);
     const metricFindQuery = new PrometheusMetricFindQuery(this, interpolated);
-    return metricFindQuery.process();
+    return metricFindQuery.process(range);
   }
 
 
@@ -714,6 +717,10 @@ export class PrometheusDatasource
   };
 
   performAnnotationQuery = (query: PromQueryRequest) => {
+    const datasource = {
+      uid: this.templateSrv.replace(query.datasource!.uid, {}),
+      type: query.datasource!.type
+    };
     return getBackendSrv()
       .fetch<BackendDataSourceResponse>({
         url: '/api/ds/query',
@@ -721,7 +728,7 @@ export class PrometheusDatasource
         data: {
           from: (query.start * 1000).toString(),
           to: (query.end * 1000).toString(),
-          queries: [{ ...query, refId: "X" }],
+          queries: [{ ...query, datasource, refId: "X" }],
         },
         requestId: query.requestId,
       }).pipe(
@@ -1008,12 +1015,12 @@ export class PrometheusDatasource
     delete variables.__interval_ms;
 
     //Add ad hoc filters
-    const expr = this.enhanceExprWithAdHocFilters(target.expr);
+    const expr = this.templateSrv.replace(target.expr, variables, this.interpolateQueryExpr);
 
     return {
       ...target,
       legendFormat: this.templateSrv.replace(target.legendFormat, variables),
-      expr: this.templateSrv.replace(expr, variables, this.interpolateQueryExpr),
+      expr: this.enhanceExprWithAdHocFilters(expr),
       interval: this.templateSrv.replace(target.interval, variables),
     };
   }
@@ -1031,6 +1038,13 @@ export class PrometheusDatasource
 
   withTemplatesUpdate(withTemplates: WithTemplate[]) {
     this.withTemplates = withTemplates ?? [];
+  }
+
+  getAdjustedInterval(timeRange: TimeRange): { start: string; end: string } {
+    return {
+      start: getVictoriaMetricsTime(timeRange.from, false).toString(),
+      end: getVictoriaMetricsTime(timeRange.to, true).toString(),
+    };
   }
 }
 

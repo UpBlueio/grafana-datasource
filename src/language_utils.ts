@@ -1,7 +1,7 @@
 // Copyright (c) 2022 Grafana Labs
 // Modifications Copyright (c) 2022 VictoriaMetrics
 // 2022-10-14: add enum AbstractLabelOperator
-// A detailed history of changes can be seen here - https://github.com/VictoriaMetrics/grafana-datasource
+// A detailed history of changes can be seen here - https://github.com/VictoriaMetrics/victoriametrics-datasource
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -19,7 +19,8 @@
 import { invert } from 'lodash';
 import { Token } from 'prismjs';
 
-import { DataQuery, AbstractQuery, AbstractLabelMatcher } from '@grafana/data';
+import { AbstractQuery, AbstractLabelMatcher, DateTime, dateMath } from '@grafana/data';
+import { DataQuery } from '@grafana/schema'
 
 import { addLabelToQuery } from './add_label_to_query';
 import { SUGGESTIONS_LIMIT } from './language_provider';
@@ -378,4 +379,20 @@ export function extractLabelMatchers(tokens: Array<string | Token>): AbstractLab
   }
 
   return labelMatchers;
+}
+
+export function getVictoriaMetricsTime(date: string | DateTime, roundUp: boolean) {
+  if (typeof date === 'string') {
+    date = dateMath.parse(date, roundUp)!;
+  }
+
+  return Math.ceil(date.valueOf() / 1000);
+}
+
+export function truncateResult<T>(array: T[], limit?: number): T[] {
+  if (limit === undefined) {
+    limit = 1000;
+  }
+  array.length = Math.min(array.length, limit);
+  return array;
 }

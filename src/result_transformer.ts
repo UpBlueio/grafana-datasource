@@ -1,7 +1,7 @@
 // Copyright (c) 2022 Grafana Labs
 // Modifications Copyright (c) 2022 VictoriaMetrics
 // 2022-10-04: change transform() return if isExemplarData
-// A detailed history of changes can be seen here - https://github.com/VictoriaMetrics/grafana-datasource
+// A detailed history of changes can be seen here - https://github.com/VictoriaMetrics/victoriametrics-datasource
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -34,6 +34,7 @@ import {
   Labels,
   MutableField,
   PreferredVisualisationType,
+  QueryResultMetaNotice,
   ScopedVars,
   TIME_SERIES_TIME_FIELD_NAME,
   TIME_SERIES_VALUE_FIELD_NAME,
@@ -260,6 +261,17 @@ export function transform(
   };
   const prometheusResult = response.data.data;
   const traceResult = response.data?.trace
+
+  if (response.data.isPartial) {
+    const partialWarning = {
+      severity: "warning",
+      text: `The shown results are marked as PARTIAL. The result is marked as partial if one or more vmstorage nodes failed to respond to the query.`
+    } as QueryResultMetaNotice
+
+    Array.isArray(options.meta.notices)
+      ? options.meta.notices.push(partialWarning)
+      : options.meta.notices = [partialWarning]
+  }
 
   if (isExemplarData(prometheusResult)) {
     return {

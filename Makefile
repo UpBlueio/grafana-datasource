@@ -1,4 +1,4 @@
-PKG_PREFIX := https://github.com/VictoriaMetrics/grafana-datasource
+PKG_PREFIX := https://github.com/VictoriaMetrics/victoriametrics-datasource
 
 DATEINFO_TAG ?= $(shell date -u +'%Y%m%d-%H%M%S')
 BUILDINFO_TAG ?= $(shell echo $$(git describe --long --all | tr '/' '-')$$( \
@@ -106,7 +106,7 @@ golang-ci-lint: install-golang-ci-lint
 	golangci-lint run ./pkg/...
 
 install-golang-ci-lint:
-	which golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.51.2
+	which golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.59.1
 
 fmt:
 	gofmt -l -w -s ./pkg

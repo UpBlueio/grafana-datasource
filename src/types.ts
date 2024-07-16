@@ -1,7 +1,7 @@
 // Copyright (c) 2022 Grafana Labs
 // Modifications Copyright (c) 2022 VictoriaMetrics
 // 2022-10-04: remove PromLabelQueryResponse
-// A detailed history of changes can be seen here - https://github.com/VictoriaMetrics/grafana-datasource
+// A detailed history of changes can be seen here - https://github.com/VictoriaMetrics/victoriametrics-datasource
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -94,6 +94,7 @@ export interface PromDataSuccessResponse<T = PromData> {
   status: 'success';
   data: T;
   trace?: TracingData;
+  isPartial?: boolean;
 }
 
 export interface PromDataErrorResponse<T = PromData> {
@@ -185,6 +186,39 @@ export enum LegendFormatMode {
   Verbose = '__verbose',
   Custom = '__custom',
 }
+
+export interface QueryBuilderLabelFilter {
+  label: string;
+  op: string;
+  value: string;
+}
+
+export enum PromVariableQueryType {
+  LabelNames,
+  LabelValues,
+  MetricNames,
+  VarQueryResult,
+  SeriesQuery,
+  ClassicQuery,
+}
+
+export interface PromVariableQuery extends DataQuery {
+  query?: string;
+  expr?: string;
+  qryType?: PromVariableQueryType;
+  label?: string;
+  metric?: string;
+  varQuery?: string;
+  seriesQuery?: string;
+  labelFilters?: QueryBuilderLabelFilter[];
+  match?: string;
+  classicQuery?: string;
+}
+
+export type StandardPromVariableQuery = {
+  query: string;
+  refId: string;
+};
 
 export interface TracingData {
   message: string;

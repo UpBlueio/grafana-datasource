@@ -1,7 +1,7 @@
 # VictoriaMetrics datasource for Grafana
 
-The [VictoriaMetrics](http://docs.victoriametrics.com/) datasource plugin allows you to query and visualize
-data from VictoriaMetrics in Grafana.
+The [VictoriaMetrics datasource plugin](https://github.com/VictoriaMetrics/victoriametrics-datasource) 
+allows to query and visualize data from VictoriaMetrics in Grafana. 
 
 * [Motivation](#motivation)
 * [Installation](#installation)
@@ -20,7 +20,7 @@ The benefits of using VictoriaMetrics plugin are the following:
 
 * [MetricsQL](https://docs.victoriametrics.com/MetricsQL.html) functions support;
 * Supports [query tracing](https://docs.victoriametrics.com/Single-server-VictoriaMetrics.html#query-tracing) in Explore mode or right in panel's expressions;
-* Supports [WITH expressions](https://github.com/VictoriaMetrics/grafana-datasource#how-to-use-with-templates);
+* Supports [WITH expressions](https://github.com/VictoriaMetrics/victoriametrics-datasource#how-to-use-with-templates);
 * Plugin fixes [label names validation](https://github.com/grafana/grafana/issues/42615) issue;
 * Integration with [vmui](https://docs.victoriametrics.com/#vmui).
 
@@ -98,33 +98,22 @@ datasources:
 
 Please find the example of provisioning Grafana instance with VictoriaMetrics datasource below:
 
-1. Create folder `./provisioning/datasource` with datasource example file:
-
-1. Download the latest release:
-
-   ``` bash
-   ver=$(curl -s https://api.github.com/repos/VictoriaMetrics/grafana-datasource/releases/latest | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-   curl -L https://github.com/VictoriaMetrics/grafana-datasource/releases/download/$ver/victoriametrics-datasource-$ver.tar.gz -o plugin.tar.gz
-   tar -xf plugin.tar.gz -C ./victoriametrics-datasource
-   rm plugin.tar.gz
-   ```
+1. Create a file at `./provisioning/datasources/vm.yml` with datasource example file.
 
 1. Define Grafana installation via docker-compose:
 
    ```yaml
      version: '3.0'
      services:
-        grafana:
-           container_name: 'grafana-datasource'
-           build:
-              context: ./.config
-              args:
-                 grafana_version: ${GRAFANA_VERSION:-9.1.2}
-           ports:
-              - 3000:3000/tcp
-           volumes:
-              - ./victoriametrics-datasource:/var/lib/grafana/plugins/grafana-datasource
-              - ./provisioning:/etc/grafana/provisioning
+       grafana:
+         image: grafana/grafana:11.0.0
+         environment:
+         - GF_INSTALL_PLUGINS=https://github.com/VictoriaMetrics/victoriametrics-datasource/releases/download/v0.8.2/victoriametrics-datasource-v0.8.2.zip;victoriametrics-datasource
+         - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=victoriametrics-datasource
+         ports:
+         - 3000:3000/tcp
+         volumes:
+         - ./provisioning:/etc/grafana/provisioning
    ```
 
 1. Run docker-compose file:
@@ -143,6 +132,21 @@ When Grafana starts successfully datasources should be present on the datasource
 
 Example with Grafana [helm chart](https://github.com/grafana/helm-charts/blob/main/charts/grafana/README.md):
 
+Option 1. Using Grafana provisioning:
+
+``` yaml
+env:
+  GF_INSTALL_PLUGINS: "https://github.com/VictoriaMetrics/victoriametrics-datasource/releases/download/v0.8.2/victoriametrics-datasource-v0.8.2.zip;victoriametrics-datasource"
+```
+
+Option 2. Using Grafana plugins section in `values.yaml`:
+
+``` yaml
+plugins:
+  - https://github.com/VictoriaMetrics/victoriametrics-datasource/releases/download/v0.8.2/victoriametrics-datasource-v0.8.2.zip;victoriametrics-datasource
+```
+
+Option 3. Using init container:
 ``` yaml
 extraInitContainers:
   - name: "load-vm-ds-plugin"
@@ -158,10 +162,10 @@ extraInitContainers:
      - |
        set -ex
        mkdir -p /var/lib/grafana/plugins/
-       ver=$(curl -s https://api.github.com/repos/VictoriaMetrics/grafana-datasource/releases/latest | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-       curl -L https://github.com/VictoriaMetrics/grafana-datasource/releases/download/$ver/victoriametrics-datasource-$ver.tar.gz -o /var/lib/grafana/plugins/plugin.tar.gz
-       tar -xf /var/lib/grafana/plugins/plugin.tar.gz -C /var/lib/grafana/plugins/
-       rm /var/lib/grafana/plugins/plugin.tar.gz
+       ver=$(curl -s https://api.github.com/repos/VictoriaMetrics/victoriametrics-datasource/releases/latest | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+       curl -L https://github.com/VictoriaMetrics/victoriametrics-datasource/releases/download/$ver/victoriametrics-datasource-$ver.tar.gz -o /var/lib/grafana/plugins/vm-plugin.tar.gz
+       tar -xf /var/lib/grafana/plugins/vm-plugin.tar.gz -C /var/lib/grafana/plugins/
+       rm /var/lib/grafana/plugins/vm-plugin.tar.gz
     volumeMounts:
       # For grafana-operator users, change `name: storage` to `name: grafana-data`
       - name: storage
@@ -181,7 +185,7 @@ sidecar:
 
 See more about chart settings [here](https://github.com/grafana/helm-charts/blob/541d97051de87a309362e02d08741ffc868cfcd6/charts/grafana/values.yaml)
 
-Another option would be to build custom Grafana image with plugin based on same installation instructions.
+Option 4 would be to build custom Grafana image with plugin based on same installation instructions.
 
 #### Grafana operator
 
@@ -210,18 +214,18 @@ spec:
               command: [ "/bin/sh" ]
               workingDir: "/var/lib/grafana"
               securityContext:
-                runAsUser: 10001
+                runAsUser: 472
                 runAsNonRoot: true
-                runAsGroup: 10001
+                runAsGroup: 472
               args:
                 - "-c"
                 - |
                   set -ex
                   mkdir -p /var/lib/grafana/plugins/
-                  ver=$(curl -s https://api.github.com/repos/VictoriaMetrics/grafana-datasource/releases/latest | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-                  curl -L https://github.com/VictoriaMetrics/grafana-datasource/releases/download/$ver/victoriametrics-datasource-$ver.tar.gz -o /var/lib/grafana/plugins/plugin.tar.gz
-                  tar -xf /var/lib/grafana/plugins/plugin.tar.gz -C /var/lib/grafana/plugins/
-                  rm /var/lib/grafana/plugins/plugin.tar.gz
+                  ver=$(curl -s https://api.github.com/repos/VictoriaMetrics/victoriametrics-datasource/releases/latest | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+                  curl -L https://github.com/VictoriaMetrics/victoriametrics-datasource/releases/download/$ver/victoriametrics-datasource-$ver.tar.gz -o /var/lib/grafana/plugins/vm-plugin.tar.gz
+                  tar -xf /var/lib/grafana/plugins/vm-plugin.tar.gz -C /var/lib/grafana/plugins/
+                  rm /var/lib/grafana/plugins/vm-plugin.tar.gz
               volumeMounts:
                 - name: grafana-data
                   mountPath: /var/lib/grafana
@@ -238,10 +242,10 @@ This example uses init container to download and install plugin.
 1. To download plugin build and move contents into Grafana plugins directory:
 
    ``` bash
-   ver=$(curl -s https://api.github.com/repos/VictoriaMetrics/grafana-datasource/releases/latest | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-   curl -L https://github.com/VictoriaMetrics/grafana-datasource/releases/download/$ver/victoriametrics-datasource-$ver.tar.gz -o /var/lib/grafana/plugins/plugin.tar.gz
-   tar -xf /var/lib/grafana/plugins/plugin.tar.gz -C /var/lib/grafana/plugins/
-   rm /var/lib/grafana/plugins/plugin.tar.gz
+   ver=$(curl -s https://api.github.com/repos/VictoriaMetrics/victoriametrics-datasource/releases/latest | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+   curl -L https://github.com/VictoriaMetrics/victoriametrics-datasource/releases/download/$ver/victoriametrics-datasource-$ver.tar.gz -o /var/lib/grafana/plugins/vm-plugin.tar.gz
+   tar -xf /var/lib/grafana/plugins/vm-plugin.tar.gz -C /var/lib/grafana/plugins/
+   rm /var/lib/grafana/plugins/vm-plugin.tar.gz
    ```
 
 1. Restart Grafana
@@ -266,7 +270,7 @@ allow_loading_unsigned_plugins = victoriametrics-datasource
 
 In the project directory, you can run:
 
-```
+```sh
 # install dependencies
 yarn install
 
@@ -370,7 +374,7 @@ To view the raw query in the interface, enable the `Raw` toggle.
     * `git tag -s v1.xx.y` in `master` branch
 1. Run `TAG=v1.xx.y make build-release` to build and package binaries in `*.tar.gz` release archives.
 1. Run `git push origin v1.xx.y` to push the tag created `v1.xx.y` at step 2 to public GitHub repository
-1. Go to <https://github.com/VictoriaMetrics/grafana-datasource/releases> and verify that draft release with the name `TAG` has been created and this release contains all the needed binaries and checksums.
+1. Go to <https://github.com/VictoriaMetrics/victoriametrics-datasource/releases> and verify that draft release with the name `TAG` has been created and this release contains all the needed binaries and checksums.
 1. Remove the `draft` checkbox for the `TAG` release and manually publish it.
 
 ## FAQ
@@ -391,9 +395,9 @@ If datasource is configured via Grafana variable, then change variable to Victor
 
 ### Why VictoriaMetrics datasource doesn't support alerting?
 
-Grafana doesn't allow forwarding Alert requests to alerting API /api/v1/rules for plugins which are not of Prometheus or Loki type. See more details [here](https://github.com/VictoriaMetrics/grafana-datasource/issues/59#issuecomment-1541456768).
+Grafana doesn't allow forwarding Alert requests to alerting API /api/v1/rules for plugins which are not of Prometheus or Loki type. See more details [here](https://github.com/VictoriaMetrics/victoriametrics-datasource/issues/59#issuecomment-1541456768).
 
 ## License
 
 This project is licensed under
-the [AGPL-3.0-only](https://github.com/VictoriaMetrics/grafana-datasource/blob/main/LICENSE).
+the [AGPL-3.0-only](https://github.com/VictoriaMetrics/victoriametrics-datasource/blob/main/LICENSE).
