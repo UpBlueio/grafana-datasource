@@ -65,30 +65,41 @@ victoriametrics-backend-plugin-build: \
 	victoriametrics-backend-plugin-arm64-prod \
 	victoriametrics-backend-plugin-windows-prod
 
-victorimetrics-frontend-plugin-build: \
+victoriametrics-frontend-plugin-build: \
 	frontend-build
 
 victoriametrics-datasource-plugin-build: \
-	victorimetrics-frontend-plugin-build \
+	victoriametrics-frontend-plugin-build \
 	victoriametrics-backend-plugin-build
 
-victoriametrics-datasource-plugin-pack:
-	tar -czf victoriametrics-datasource-$(PKG_TAG).tar.gz victoriametrics-datasource \
-	&& sha256sum victoriametrics-datasource-$(PKG_TAG).tar.gz \
-	> victoriametrics-datasource-$(PKG_TAG)_checksums.txt \
-	&& rm -rf ./victoriametrics-datasource
+victoriametrics-datasource-plugin-pack-tar:
+	cd plugins && \
+	tar -czf ../victorialogs-datasource-$(PKG_TAG).tar.gz ./victorialogs-datasource \
+	&& sha256sum ../victorialogs-datasource-$(PKG_TAG).tar.gz \
+	> ../victorialogs-datasource-$(PKG_TAG)_checksums_tar.txt && cd ..
+
+victoriametrics-datasource-plugin-pack-zip:
+	cd plugins && \
+	zip -r ../victorialogs-datasource-$(PKG_TAG).zip ./victorialogs-datasource \
+	&& sha256sum ../victorialogs-datasource-$(PKG_TAG).zip \
+	> ../victorialogs-datasource-$(PKG_TAG)_checksums_zip.txt && cd ..
+
+victoriametrics-datasource-plugin-clean:
+	rm -rf ./plugins
 
 victoriametrics-datasource-frontend-plugin-pack: \
 	frontend-pack
 
 victoriametrics-datasource-frontend-plugin-release: \
-	victorimetrics-frontend-plugin-build \
+	victoriametrics-frontend-plugin-build \
 	victoriametrics-datasource-frontend-plugin-pack
 
 victoriametrics-datasource-plugin-release: \
-	victorimetrics-frontend-plugin-build \
+	victoriametrics-frontend-plugin-build \
 	victoriametrics-backend-plugin-build \
-	victoriametrics-datasource-plugin-pack
+	victoriametrics-datasource-plugin-pack-tar \
+	victoriametrics-datasource-plugin-pack-zip \
+	victoriametrics-datasource-plugin-clean
 
 build-release:
 	git checkout $(TAG) && $(MAKE) victoriametrics-datasource-plugin-release
