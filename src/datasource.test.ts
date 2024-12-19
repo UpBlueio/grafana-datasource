@@ -1,9 +1,10 @@
 
 import { cloneDeep } from 'lodash';
 import { of } from 'rxjs';
-import { ScopedVar, ScopedVars } from '@grafana/data';
 
 import {
+  ScopedVar,
+  ScopedVars,
   CoreApp,
   DataQueryRequest,
   DataQueryResponse,
@@ -224,8 +225,8 @@ describe('PrometheusDatasource', () => {
         return str.replace('$topk', topk.value);
       });
       const caseTarget: PromQuery = { expr: 'topk_max($topk, vmalert_iteration_duration_seconds_sum)', refId: 'A' };
-      const result = ds.createQuery(caseTarget, { interval: '15s', scopedVars: { 'topk': { text: 'topk', value: '5' } } as ScopedVars} as DataQueryRequest<PromQuery>, 0, 0);
-      expect(result).toMatchObject({ expr: 'topk_max(5, vmalert_iteration_duration_seconds_sum{k1="v1"})'});
+      const result = ds.createQuery(caseTarget, { interval: '15s', scopedVars: { 'topk': { text: 'topk', value: '5' } } as ScopedVars } as DataQueryRequest<PromQuery>, 0, 0);
+      expect(result).toMatchObject({ expr: 'topk_max(5, vmalert_iteration_duration_seconds_sum{k1="v1"})' });
     });
   });
 
@@ -520,12 +521,12 @@ describe('PrometheusDatasource', () => {
         const topk = params['topk'] as ScopedVar;
         return str?.replace('$topk', topk.value);
       });
-      const query: PromQuery = { 
-        expr: 'topk_max($topk, vmalert_iteration_duration_seconds_sum)', 
-        refId: 'A' 
+      const query: PromQuery = {
+        expr: 'topk_max($topk, vmalert_iteration_duration_seconds_sum)',
+        refId: 'A'
       };
       const result = ds.applyTemplateVariables(query, { 'topk': { text: 'topk', value: '5' } } as ScopedVars);
-      expect(result).toMatchObject({ expr: 'topk_max(5, vmalert_iteration_duration_seconds_sum{k1="v1"})'});
+      expect(result).toMatchObject({ expr: 'topk_max(5, vmalert_iteration_duration_seconds_sum{k1="v1"})' });
     });
   });
 

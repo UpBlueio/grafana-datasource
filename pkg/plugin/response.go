@@ -172,13 +172,13 @@ func (r *Response) getDataFrames() (data.Frames, error) {
 	case vector:
 		var pi promInstant
 		if err := json.Unmarshal(r.Data.Result, &pi.Result); err != nil {
-			return nil, fmt.Errorf("umarshal err %s; \n %#v", err, string(r.Data.Result))
+			return nil, fmt.Errorf("unmarshal err %s; \n %#v", err, string(r.Data.Result))
 		}
 		return pi.dataframes()
 	case matrix:
 		var pr promRange
 		if err := json.Unmarshal(r.Data.Result, &pr.Result); err != nil {
-			return nil, fmt.Errorf("umarshal err %s; \n %#v", err, string(r.Data.Result))
+			return nil, fmt.Errorf("unmarshal err %s; \n %#v", err, string(r.Data.Result))
 		}
 		return pr.dataframes()
 	case matrixstring:
@@ -190,7 +190,7 @@ func (r *Response) getDataFrames() (data.Frames, error) {
 	case scalar:
 		var ps promScalar
 		if err := json.Unmarshal(r.Data.Result, &ps); err != nil {
-			return nil, fmt.Errorf("umarshal err %s; \n %#v", err, string(r.Data.Result))
+			return nil, fmt.Errorf("unmarshal err %s; \n %#v", err, string(r.Data.Result))
 		}
 		return ps.dataframes()
 	default:
